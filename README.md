@@ -1,3 +1,5 @@
+> 个人维护版：本地安装、数据备份与上游更新流程见 [LOCAL-SETUP.md](LOCAL-SETUP.md)。
+
 <div align="center">
   <img src="public/logo.svg" alt="Siftly" width="80" height="80" />
 

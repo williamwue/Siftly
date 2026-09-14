@@ -9,7 +9,7 @@ const BATCH_SIZE = 20
 
 const DEFAULT_CATEGORIES = [
   {
-    name: 'AI & Machine Learning',
+    name: 'AI 与机器学习',
     slug: 'ai-resources',
     color: '#8b5cf6',
     description:
@@ -17,7 +17,7 @@ const DEFAULT_CATEGORIES = [
     isAiGenerated: false,
   },
   {
-    name: 'Crypto & Web3',
+    name: '加密货币与 Web3',
     slug: 'finance-crypto',
     color: '#f59e0b',
     description:
@@ -25,7 +25,7 @@ const DEFAULT_CATEGORIES = [
     isAiGenerated: false,
   },
   {
-    name: 'Dev Tools & Engineering',
+    name: '开发工具与工程',
     slug: 'dev-tools',
     color: '#06b6d4',
     description:
@@ -33,7 +33,7 @@ const DEFAULT_CATEGORIES = [
     isAiGenerated: false,
   },
   {
-    name: 'Finance & Investing',
+    name: '金融与投资',
     slug: 'finance-investing',
     color: '#10b981',
     description:
@@ -41,7 +41,7 @@ const DEFAULT_CATEGORIES = [
     isAiGenerated: false,
   },
   {
-    name: 'Startups & Business',
+    name: '创业与商业',
     slug: 'startups-business',
     color: '#f97316',
     description:
@@ -49,7 +49,7 @@ const DEFAULT_CATEGORIES = [
     isAiGenerated: false,
   },
   {
-    name: 'News & Politics',
+    name: '新闻与社会',
     slug: 'news',
     color: '#6366f1',
     description:
@@ -57,7 +57,7 @@ const DEFAULT_CATEGORIES = [
     isAiGenerated: false,
   },
   {
-    name: 'Design & Product',
+    name: '设计与产品',
     slug: 'design',
     color: '#ec4899',
     description:
@@ -65,7 +65,7 @@ const DEFAULT_CATEGORIES = [
     isAiGenerated: false,
   },
   {
-    name: 'Health & Wellness',
+    name: '健康与生活',
     slug: 'health-wellness',
     color: '#14b8a6',
     description:
@@ -73,7 +73,7 @@ const DEFAULT_CATEGORIES = [
     isAiGenerated: false,
   },
   {
-    name: 'Security & Privacy',
+    name: '安全与隐私',
     slug: 'security-privacy',
     color: '#ef4444',
     description:
@@ -81,7 +81,7 @@ const DEFAULT_CATEGORIES = [
     isAiGenerated: false,
   },
   {
-    name: 'Science & Research',
+    name: '科学与研究',
     slug: 'science-research',
     color: '#3b82f6',
     description:
@@ -89,7 +89,7 @@ const DEFAULT_CATEGORIES = [
     isAiGenerated: false,
   },
   {
-    name: 'Productivity',
+    name: '效率与知识管理',
     slug: 'productivity',
     color: '#a855f7',
     description:
@@ -97,7 +97,7 @@ const DEFAULT_CATEGORIES = [
     isAiGenerated: false,
   },
   {
-    name: 'Funny & Memes',
+    name: '娱乐与趣味',
     slug: 'funny-memes',
     color: '#eab308',
     description:
@@ -105,7 +105,7 @@ const DEFAULT_CATEGORIES = [
     isAiGenerated: false,
   },
   {
-    name: 'General',
+    name: '其他参考',
     slug: 'general',
     color: '#64748b',
     description: "Miscellaneous content that doesn't clearly fit any other category — use sparingly, only when no other category applies",
