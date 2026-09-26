@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
+import { wasDeleted } from '@/lib/bookmark-deletion'
 import { parseBookmarksJson } from '@/lib/parser'
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         select: { id: true },
       })
 
-      if (existing) {
+      if (existing || await wasDeleted(bookmark.tweetId)) {
         skippedCount++
         continue
       }

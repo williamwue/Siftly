@@ -1,3 +1,4 @@
+import { wasDeleted } from '@/lib/bookmark-deletion'
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 
@@ -135,7 +136,7 @@ export async function POST(req: NextRequest) {
         where: { tweetId: tweet.id },
         select: { id: true },
       })
-      if (existing) { skipped++; continue }
+      if (existing || await wasDeleted(tweet.id)) { skipped++; continue }
 
       const author = tweet.author_id ? usersMap.get(tweet.author_id) : undefined
 

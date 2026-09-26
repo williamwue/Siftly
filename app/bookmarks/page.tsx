@@ -222,6 +222,11 @@ function BookmarksPageInner() {
   const [pendingDelete, setPendingDelete] = useState<string[]>([])
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [syncX, setSyncX] = useState(false)
+  const [xAccount, setXAccount] = useState('')
+  const [syncItems, setSyncItems] = useState<Array<{id: string; tweetId: string; status: string; error: string | null}>>([])
+  const syncCompleted = useRef<number | null>(null)
+  const [syncError, setSyncError] = useState('')
   const [deleteNotice, setDeleteNotice] = useState('')
   const deleteLock = useRef(false)
   const requestVersion = useRef(0)
@@ -236,6 +241,9 @@ function BookmarksPageInner() {
       if (!res.ok) throw new Error('Failed to fetch')
       const data: BookmarksResponse = await res.json()
       if (version !== requestVersion.current) return
+      if (f.page > Math.max(1, Math.ceil(data.total / limit))) {
+        setFilters(previous => ({ ...previous, page: Math.max(1, Math.ceil(data.total / limit)) }))
+      }
       setBookmarks(data.bookmarks)
       setTotal(data.total)
     } catch (err) {
@@ -254,8 +262,43 @@ function BookmarksPageInner() {
     fetchBookmarks(filters, pageSize)
   }, [fetchBookmarks, filters, pageSize])
 
+  useEffect(() => {
+    let cancelled = false
+    async function poll() {
+      try {
+        const response = await fetch('/api/bookmarks/x-sync')
+        if (!response.ok) throw new Error('无法读取 X 同步状态')
+        const data = await response.json()
+        if (cancelled) return
+        setSyncItems(data.items)
+        setXAccount(previous => previous || data.account)
+        setSyncError('')
+        if (syncCompleted.current !== null && syncCompleted.current !== data.completed) {
+          setFilters(previous => ({ ...previous }))
+          window.dispatchEvent(new Event('siftly:bookmarks-changed'))
+          setDeleteNotice('X 取消收藏成功，已同步删除对应的本地书签。')
+        }
+        syncCompleted.current = data.completed
+      } catch {
+        if (!cancelled) setSyncError('暂时无法读取 X 同步状态，请刷新页面重试。')
+      }
+    }
+    void poll()
+    const timer = setInterval(() => void poll(), 3000)
+    return () => { cancelled = true; clearInterval(timer) }
+  }, [])
+
+  async function retrySync(id: string) {
+    try {
+      const response = await fetch('/api/bookmarks/x-sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+      if (!response.ok) throw new Error('重试失败')
+      setSyncItems(items => items.map(item => item.id === id ? { ...item, status: 'pending', error: null } : item))
+    } catch { setSyncError('提交重试失败，请稍后再试。') }
+  }
+
   function requestDelete(ids: string[]) {
     setDeleteError('')
+    setSyncX(false)
     setPendingDelete([...ids])
   }
 
@@ -267,14 +310,18 @@ function BookmarksPageInner() {
     try {
       const response = await fetch('/api/bookmarks/delete', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: pendingDelete }),
+        body: JSON.stringify({ ids: pendingDelete, syncX, account: xAccount }),
       })
-      if (!response.ok) throw new Error('删除失败，请重试。')
-      const result: { deleted: number } = await response.json()
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || '删除失败，请重试。')
       setPendingDelete([])
       setSelected([])
       setOpenBookmark(null)
-      setDeleteNotice(`已删除 ${result.deleted} 条本地书签。X 上的收藏不受影响。`)
+      if (syncX) {
+        setDeleteNotice(`已提交 ${result.queued} 条 X 同步任务；确认取消收藏后才会删除本地记录。`)
+        return
+      }
+      setDeleteNotice(`已删除 ${result.deleted} 条本地书签。X 上的收藏不受影响，重新导入会跳过这些记录。`)
       window.dispatchEvent(new Event('siftly:bookmarks-changed'))
       const removedHere = bookmarks.filter((b) => pendingDelete.includes(b.id)).length
       const page = Math.min(filters.page, Math.max(1, Math.ceil((total - removedHere) / pageSize)))
@@ -497,6 +544,16 @@ function BookmarksPageInner() {
           </div>
         )}
 
+        {syncError && <p role="alert" className="mb-3 text-sm text-red-400">{syncError}</p>}
+        {syncItems.length > 0 && <section aria-label="X 删除同步" className="mb-4 rounded border border-zinc-700 p-3 text-sm">
+          <p className="mb-2 font-medium">X 删除同步</p>
+          {syncItems.map(item => <div key={item.id} className="mb-2 flex flex-wrap items-center gap-3">
+            <a href={`https://x.com/i/status/${item.tweetId}`} target="_blank" rel="noreferrer" className="text-blue-400">{item.tweetId}</a>
+            <span>{item.status === 'failed' ? '失败，本地已保留' : item.status === 'running' ? '正在取消 X 收藏…' : '等待处理'}</span>
+            {item.error && <span className="text-red-400">{item.error}</span>}
+            {item.status === 'failed' && <button onClick={() => void retrySync(item.id)} className="text-blue-400">重试</button>}
+          </div>)}
+        </section>}
         {deleteNotice && <p role="status" className="mb-3 text-sm text-zinc-400">{deleteNotice}</p>}
         {!loading && bookmarks.length > 0 && (
           <div className="flex items-center gap-4 mb-4 text-sm text-zinc-300">
@@ -514,11 +571,13 @@ function BookmarksPageInner() {
             <Dialog.Overlay className="fixed inset-0 z-[60] bg-black/70" />
             <Dialog.Content className="fixed left-1/2 top-1/2 z-[61] w-[90vw] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border border-zinc-700 bg-zinc-900 p-6 text-zinc-100">
               <Dialog.Title className="text-lg font-semibold">删除 {pendingDelete.length} 条书签？</Dialog.Title>
-              <Dialog.Description className="mt-3 text-sm text-zinc-400">仅删除 Siftly 本地书签及其媒体、分类关联，不影响 X 收藏或其他书签。删除后无法在页面撤销；以后重新导入可能再次出现。</Dialog.Description>
+              <Dialog.Description className="mt-3 text-sm text-zinc-400">{syncX ? '先取消指定 X 账号的收藏，确认成功后再删除本地记录。失败时保留本地书签，可单独重试。不会删除原推文。' : '仅删除 Siftly 本地书签及其媒体、分类关联，不影响 X 收藏。重新导入会跳过已删除记录。删除后无法在页面撤销。'}</Dialog.Description>
+              <label className="mt-4 flex items-center gap-2 text-sm"><input type="checkbox" checked={syncX} disabled={deleting} onChange={e => setSyncX(e.target.checked)} />同时取消 X 收藏</label>
+              {syncX && <label className="mt-3 block text-sm">X 用户名（Ego 浏览器须已登录此账号）<input aria-label="X 用户名" value={xAccount} disabled={deleting} onChange={e => setXAccount(e.target.value)} placeholder="例如 williamwue" className="mt-2 w-full rounded border border-zinc-600 bg-zinc-800 p-2" /></label>}
               {deleteError && <p role="alert" className="mt-3 text-red-400">{deleteError}</p>}
               <div className="mt-5 flex justify-end gap-4">
                 <button disabled={deleting} onClick={() => setPendingDelete([])}>取消</button>
-                <button disabled={deleting} className="rounded bg-red-600 px-3 py-2 disabled:opacity-50" onClick={() => void confirmDelete()}>{deleting ? '删除中…' : '确认删除'}</button>
+                <button disabled={deleting} className="rounded bg-red-600 px-3 py-2 disabled:opacity-50" onClick={() => void confirmDelete()}>{deleting ? '提交中…' : syncX ? '确认同步删除' : '确认删除'}</button>
               </div>
             </Dialog.Content>
           </Dialog.Portal>

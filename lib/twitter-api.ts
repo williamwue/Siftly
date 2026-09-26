@@ -1,3 +1,4 @@
+import { wasDeleted } from '@/lib/bookmark-deletion'
 import prisma from '@/lib/db'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -249,7 +250,7 @@ export async function importTweets(
         select: { id: true },
       })
 
-      if (exists) {
+      if (exists || await wasDeleted(tweet.rest_id)) {
         skipped++
         continue
       }

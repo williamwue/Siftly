@@ -1,3 +1,4 @@
+import { wasDeleted } from '@/lib/bookmark-deletion'
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 
@@ -279,7 +280,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           select: { id: true },
         })
 
-        if (exists) {
+        if (exists || await wasDeleted(tweet.rest_id)) {
           skipped++
           continue
         }

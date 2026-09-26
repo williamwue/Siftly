@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
+import { deleteLocalBookmarks } from '@/lib/bookmark-deletion'
+import { openQueue, enqueue } from '@/lib/x-sync-queue'
+import { startXSync } from '@/lib/start-x-sync'
 
 export async function POST(request: NextRequest) {
   let body: unknown
@@ -13,16 +16,22 @@ export async function POST(request: NextRequest) {
   }
   const ids: string[] = [...new Set<string>(body.ids)]
   try {
-    const deleted = await prisma.$transaction(async (tx) => {
-      await tx.bookmarkCategory.deleteMany({ where: { bookmarkId: { in: ids } } })
-      await tx.mediaItem.deleteMany({ where: { bookmarkId: { in: ids } } })
-      const result = await tx.bookmark.deleteMany({ where: { id: { in: ids } } })
-      const tables = await tx.$queryRaw<Array<{ name: string }>>`SELECT name FROM sqlite_master WHERE name = 'bookmark_fts'`
-      if (tables.length) {
-        for (const id of ids) await tx.$executeRaw`DELETE FROM bookmark_fts WHERE bookmark_id = ${id}`
-      }
-      return result.count
-    })
+    const mode = 'syncX' in body ? body.syncX : false
+    if (typeof mode !== 'boolean') return NextResponse.json({ error: 'Invalid syncX' }, { status: 400 })
+    if (mode) {
+      const origin = request.headers.get('origin')
+      if (origin && new URL(origin).host !== request.headers.get('host')) return NextResponse.json({ error: 'Origin mismatch' }, { status: 403 })
+      const account = 'account' in body && typeof body.account === 'string' ? body.account.replace(/^@/, '').trim() : ''
+      if (!/^[A-Za-z0-9_]{1,15}$/.test(account)) return NextResponse.json({ error: '请填写要同步的 X 用户名。' }, { status: 400 })
+      const rows = await prisma.bookmark.findMany({ where: { id: { in: ids } }, select: { id: true, tweetId: true, source: true } })
+      if (rows.some(r => r.source !== 'bookmark' || !/^\d+$/.test(r.tweetId))) return NextResponse.json({ error: '仅支持 X 书签，不能同步点赞或其他来源。' }, { status: 400 })
+      const db = openQueue()
+      try { enqueue(db, rows, account) } finally { db.close() }
+      await prisma.setting.upsert({ where: { key: 'xBookmarkAccount' }, create: { key: 'xBookmarkAccount', value: account }, update: { value: account } })
+      startXSync()
+      return NextResponse.json({ queued: rows.length }, { status: 202 })
+    }
+    const deleted = await deleteLocalBookmarks(ids)
     return NextResponse.json({ deleted })
   } catch (error) {
     console.error('Delete selected bookmarks failed', error)

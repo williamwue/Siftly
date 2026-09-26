@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
+import { wasDeleted } from '@/lib/bookmark-deletion'
 
 const ALLOWED_ORIGINS = new Set(['https://x.com', 'https://twitter.com'])
 
@@ -137,7 +138,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       select: { id: true },
     })
 
-    if (exists) {
+    if (exists || await wasDeleted(tweet.rest_id)) {
       skipped++
       continue
     }

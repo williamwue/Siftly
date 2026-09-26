@@ -80,3 +80,26 @@ model Setting {
   key   String @id
   value String
 }
+
+// Durable local deletion exclusions survive subsequent imports.
+model DeletedBookmark {
+  tweetId   String @id
+  deletedAt String
+}
+
+// No foreign key: completion history survives deletion of the bookmark.
+model XBookmarkRemoval {
+  id         String @id
+  bookmarkId String @unique
+  tweetId    String
+  account    String
+  status     String
+  error      String?
+  updatedAt  BigInt
+}
+
+model XBookmarkWorker {
+  id        Int @id
+  owner     String?
+  heartbeat BigInt?
+}
