@@ -1,4 +1,14 @@
-> 个人维护版：本地安装、数据备份与上游更新流程见 [LOCAL-SETUP.md](LOCAL-SETUP.md)。
+# Siftly 中文增强版
+
+基于 [viperrcrypto/Siftly](https://github.com/viperrcrypto/Siftly) 的社区维护 fork，由 [williamwue](https://github.com/williamwue) 维护，与上游官方项目独立。沿用 [MIT 许可证](LICENSE)，保留上游版权声明及提交历史。
+
+已包含中文默认分类、中文分类 slug 支持、X 导入缺少作者时的兼容修正、Next.js 16.3.5 及同步锁文件、本机启动脚本和 SQLite 在线备份脚本。
+
+安装、启动和备份见 [本地维护指南](LOCAL-SETUP.md)。本仓库不包含个人书签、数据库、登录凭据或导入记录。
+
+后续计划见 [ROADMAP.md](ROADMAP.md)。单条删除、勾选批量删除、侧边栏加载恢复及可复用增量同步目前尚未实现。以下保留上游项目介绍；其中上游安装命令的仓库地址请替换为 `https://github.com/williamwue/Siftly.git`。
+
+---
 
 <div align="center">
   <img src="public/logo.svg" alt="Siftly" width="80" height="80" />

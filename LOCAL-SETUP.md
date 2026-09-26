@@ -1,6 +1,6 @@
 # 个人维护版 Siftly
 
-本地地址：http://127.0.0.1:7310/bookmarks 。项目保留上游完整历史；`main` 保存个人维护版本，`upstream` 指向原作者仓库。当前没有个人云端远程仓库。
+本地地址：http://127.0.0.1:7310/bookmarks 。项目保留上游完整历史；`main` 保存个人维护版本，`upstream` 指向原作者仓库。公开 fork 为 https://github.com/williamwue/Siftly ，`origin` 指向该仓库。
 
 ## 安装与运行
 
@@ -57,6 +57,6 @@ git switch -c chore/upstream-update
 git merge upstream/main
 ```
 
-解决冲突并验证后再合并到个人 `main`。如未来建立个人私有远程，将其命名为 `origin`，保留 `upstream`。上游许可证保持不变。
+解决冲突并验证后再合并到个人 `main`。发布个人版本时推送到 `origin`，保留 `upstream` 用于获取原作者更新。上游许可证保持不变。
 
 当前基线保留中文分类、Unicode slug、X 导入作者缺失的兼容修正，以及 Next.js 16.3.5 和同步锁文件。依赖安全审计尚未全面解决，历史详情见本机操作记录。
