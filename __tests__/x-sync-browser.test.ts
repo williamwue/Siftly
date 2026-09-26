@@ -7,7 +7,7 @@ async function run(states: unknown[], clickError?: string) {
     evaluate: vi.fn().mockImplementation(async () => states.shift()),
     click: vi.fn().mockImplementation(async () => { if (clickError) throw new Error(clickError) }) }
   const finish = vi.fn(), log = vi.fn()
-  await new AsyncFunction('taskSpace', 'process', 'console', source)(async () => ({ page: () => page, finish }), { env: { SIFTLY_X_JOBS: JSON.stringify([{ id: 'job', tweetId: '123', account: 'expected' }]) } }, { log })
+  await new AsyncFunction('taskSpace', 'jobs', 'console', source)(async () => ({ page: () => page, finish }), [{ id: 'job', tweetId: '123', account: 'expected' }], { log })
   const result = JSON.parse(log.mock.calls[0][0].replace('SIFTLY_RESULT ', ''))
   return { page, finish, result }
 }

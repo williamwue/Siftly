@@ -29,7 +29,7 @@ test('queue deduplicates requests and only one worker can hold the lease', () =>
 test('worker deletes locally only on verified success, preserves failed data, retries idempotently', () => {
   const fake = path.join(directory, 'fake-ego')
   writeFileSync(fake, `#!/usr/bin/env node
-process.stdin.resume();process.stdin.on('end',()=>{for(const job of JSON.parse(process.env.SIFTLY_X_JOBS)) console.log('SIFTLY_RESULT '+JSON.stringify({id:job.id,ok:job.tweetId==='100'||process.env.TEST_RETRY==='1',error:'account mismatch'}));});`)
+let input='';process.stdin.on('data',chunk=>input+=chunk);process.stdin.on('end',()=>{const jobs=JSON.parse(input.split('\\n')[0].slice(13,-1));for(const job of jobs) console.error('SIFTLY_RESULT '+JSON.stringify({id:job.id,ok:job.tweetId==='100'||process.env.TEST_RETRY==='1',error:'account mismatch'}));});`)
   chmodSync(fake, 0o755)
   const run = (retry = false) => execFileSync(process.execPath, ['--import', 'tsx', 'scripts/x-sync-worker.ts'], { cwd: process.cwd(), env: { ...process.env, SIFTLY_EGO_BINARY: fake, TEST_RETRY: retry ? '1' : '0' }, timeout: 20000 })
   run()

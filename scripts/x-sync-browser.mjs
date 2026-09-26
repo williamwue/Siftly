@@ -1,5 +1,5 @@
 // Executed inside ego-browser nodejs. Inputs contain only IDs and the expected account.
-const jobs = JSON.parse(process.env.SIFTLY_X_JOBS || '[]')
+// `jobs` is injected as a JSON literal by the worker; Ego does not forward env vars.
 const task = await taskSpace('Siftly: cancel X bookmarks')
 const page = task.page('p1')
 let relinquished = false
@@ -31,8 +31,8 @@ try {
       if (before.profile?.toLowerCase() !== job.account.toLowerCase()) throw new Error('X 登录账号不匹配或未登录；请在 Ego 中登录 @' + job.account)
       if (!before.saved && !before.unsaved) throw new Error('无法确认原帖的收藏状态，保留本地记录。')
       if (before.saved) {
-        await page.click(`[data-siftly-target="${job.tweetId}"] [data-testid="removeBookmark"]`, { label: '取消这条 X 收藏' })
-        await page.waitForSelector(`[data-siftly-target="${job.tweetId}"] [data-testid="bookmark"]`, { state: 'visible', timeout: 15000 })
+        await page.click(`[data-siftly-target="${job.tweetId}"] [data-testid="removeBookmark"] >> nth=0`, { label: '取消这条 X 收藏' })
+        await page.waitForSelector(`[data-siftly-target="${job.tweetId}"] [data-testid="bookmark"] >> nth=0`, { state: 'visible', timeout: 15000 })
       }
       // A full reload verifies the persisted state, not only X's optimistic UI.
       await page.reload()

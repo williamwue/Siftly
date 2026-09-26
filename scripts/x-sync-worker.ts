@@ -20,11 +20,10 @@ async function main() {
     })()
     if (!jobs.length) return
     const child = spawn(process.env.SIFTLY_EGO_BINARY || 'ego-browser', ['nodejs'], {
-      cwd: process.cwd(), env: { ...process.env, SIFTLY_X_JOBS: JSON.stringify(jobs) }, stdio: ['pipe', 'pipe', 'pipe'],
+      cwd: process.cwd(), env: process.env, stdio: ['pipe', 'pipe', 'pipe'],
     })
     let updates = Promise.resolve()
-    const lines = createInterface({ input: child.stdout })
-    lines.on('line', line => {
+    const handleLine = (line: string) => {
       if (!line.startsWith('SIFTLY_RESULT ')) return
       updates = updates.then(async () => {
         const result = JSON.parse(line.slice(14))
@@ -41,11 +40,13 @@ async function main() {
           db.prepare("UPDATE XBookmarkRemoval SET status='failed', error='X 已处理，但本地删除失败；可安全重试。', updatedAt=? WHERE id=?").run(Date.now(), job.id)
         }
       }).catch(() => { /* Remaining running jobs become failed below. */ })
-    })
-    // Drain stderr without persisting browser/session output.
-    child.stderr.resume()
+    }
+    // Ego emits console.log receipts on stderr; support both output channels.
+    createInterface({ input: child.stdout }).on('line', handleLine)
+    createInterface({ input: child.stderr }).on('line', handleLine)
     child.stdin.on('error', () => {})
-    child.stdin.end(readFileSync(path.join(process.cwd(), 'scripts/x-sync-browser.mjs'), 'utf8'))
+    const payload = jobs.map(({ id, tweetId, account }) => ({ id, tweetId, account }))
+    child.stdin.end('const jobs = ' + JSON.stringify(payload) + ';\n' + readFileSync(path.join(process.cwd(), 'scripts/x-sync-browser.mjs'), 'utf8'))
     await new Promise<void>((resolve, reject) => { child.once('error', reject); child.once('close', () => resolve()) })
     await updates
   } catch {
