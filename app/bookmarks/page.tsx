@@ -16,6 +16,7 @@ import {
   ChevronDown,
   ArrowUpDown,
 } from 'lucide-react'
+import * as Dialog from '@radix-ui/react-dialog'
 import * as Select from '@radix-ui/react-select'
 import BookmarkCard from '@/components/bookmark-card'
 import BookmarkRow from '@/components/bookmark-row'
@@ -217,22 +218,33 @@ function BookmarksPageInner() {
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'compact'>('grid')
   const [openBookmark, setOpenBookmark] = useState<BookmarkWithMedia | null>(null)
+  const [selected, setSelected] = useState<string[]>([])
+  const [pendingDelete, setPendingDelete] = useState<string[]>([])
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  const [deleteNotice, setDeleteNotice] = useState('')
+  const deleteLock = useRef(false)
+  const requestVersion = useRef(0)
   const searchRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const fetchBookmarks = useCallback(async (f: Filters, limit: number) => {
+    const version = ++requestVersion.current
+    setSelected([])
     setLoading(true)
     try {
       const res = await fetch(buildUrl(f, limit))
       if (!res.ok) throw new Error('Failed to fetch')
       const data: BookmarksResponse = await res.json()
+      if (version !== requestVersion.current) return
       setBookmarks(data.bookmarks)
       setTotal(data.total)
     } catch (err) {
+      if (version !== requestVersion.current) return
       console.error(err)
       setBookmarks([])
       setTotal(0)
     } finally {
-      setLoading(false)
+      if (version === requestVersion.current) setLoading(false)
     }
   }, [])
 
@@ -241,6 +253,53 @@ function BookmarksPageInner() {
   useEffect(() => {
     fetchBookmarks(filters, pageSize)
   }, [fetchBookmarks, filters, pageSize])
+
+  function requestDelete(ids: string[]) {
+    setDeleteError('')
+    setPendingDelete([...ids])
+  }
+
+  async function confirmDelete() {
+    if (deleteLock.current || pendingDelete.length === 0) return
+    deleteLock.current = true
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      const response = await fetch('/api/bookmarks/delete', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: pendingDelete }),
+      })
+      if (!response.ok) throw new Error('删除失败，请重试。')
+      const result: { deleted: number } = await response.json()
+      setPendingDelete([])
+      setSelected([])
+      setOpenBookmark(null)
+      setDeleteNotice(`已删除 ${result.deleted} 条本地书签。X 上的收藏不受影响。`)
+      window.dispatchEvent(new Event('siftly:bookmarks-changed'))
+      const removedHere = bookmarks.filter((b) => pendingDelete.includes(b.id)).length
+      const page = Math.min(filters.page, Math.max(1, Math.ceil((total - removedHere) / pageSize)))
+      setFilters((prev) => ({ ...prev, page }))
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : '删除失败，请重试。')
+    } finally {
+      deleteLock.current = false
+      setDeleting(false)
+    }
+  }
+
+  function bookmarkActions(bookmark: BookmarkWithMedia) {
+    return (
+      <div className="flex items-center justify-between px-3 py-2 text-sm text-zinc-400">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" aria-label={`选择 @${bookmark.authorHandle} 的书签 ${bookmark.id}`}
+            checked={selected.includes(bookmark.id)}
+            onChange={(e) => setSelected((prev) => e.target.checked ? [...prev, bookmark.id] : prev.filter((id) => id !== bookmark.id))} />
+          选择
+        </label>
+        <button type="button" className="text-red-400 hover:text-red-300" onClick={() => requestDelete([bookmark.id])}>删除</button>
+      </div>
+    )
+  }
 
   function handleSetViewMode(mode: 'grid' | 'list' | 'compact') {
     setViewMode(mode)
@@ -422,7 +481,7 @@ function BookmarksPageInner() {
                 <>
                   <span className="text-zinc-200 font-semibold">{total.toLocaleString()}</span>
                   {' '}bookmark{total !== 1 ? 's' : ''}
-                  {filters.q && <span className="text-zinc-600"> for "{filters.q}"</span>}
+                  {filters.q && <span className="text-zinc-600"> for &quot;{filters.q}&quot;</span>}
                 </>
               ) : (
                 'No bookmarks found'
@@ -438,6 +497,32 @@ function BookmarksPageInner() {
           </div>
         )}
 
+        {deleteNotice && <p role="status" className="mb-3 text-sm text-zinc-400">{deleteNotice}</p>}
+        {!loading && bookmarks.length > 0 && (
+          <div className="flex items-center gap-4 mb-4 text-sm text-zinc-300">
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={selected.length === bookmarks.length}
+                onChange={(e) => setSelected(e.target.checked ? bookmarks.map((b) => b.id) : [])} />
+              全选本页
+            </label>
+            <span>已选 {selected.length} 条</span>
+            <button disabled={!selected.length} className="text-red-400 disabled:opacity-40" onClick={() => requestDelete(selected)}>删除所选</button>
+          </div>
+        )}
+        <Dialog.Root open={pendingDelete.length > 0} onOpenChange={(open) => { if (!open && !deleting) setPendingDelete([]) }}>
+          <Dialog.Portal>
+            <Dialog.Overlay className="fixed inset-0 z-[60] bg-black/70" />
+            <Dialog.Content className="fixed left-1/2 top-1/2 z-[61] w-[90vw] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border border-zinc-700 bg-zinc-900 p-6 text-zinc-100">
+              <Dialog.Title className="text-lg font-semibold">删除 {pendingDelete.length} 条书签？</Dialog.Title>
+              <Dialog.Description className="mt-3 text-sm text-zinc-400">仅删除 Siftly 本地书签及其媒体、分类关联，不影响 X 收藏或其他书签。删除后无法在页面撤销；以后重新导入可能再次出现。</Dialog.Description>
+              {deleteError && <p role="alert" className="mt-3 text-red-400">{deleteError}</p>}
+              <div className="mt-5 flex justify-end gap-4">
+                <button disabled={deleting} onClick={() => setPendingDelete([])}>取消</button>
+                <button disabled={deleting} className="rounded bg-red-600 px-3 py-2 disabled:opacity-50" onClick={() => void confirmDelete()}>{deleting ? '删除中…' : '确认删除'}</button>
+              </div>
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog.Root>
         {/* Empty state */}
         {!loading && bookmarks.length === 0 && (
           <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -465,6 +550,7 @@ function BookmarksPageInner() {
           <div className="masonry-grid">
             {bookmarks.map((bookmark) => (
               <div key={bookmark.id} className="masonry-item">
+                {bookmarkActions(bookmark)}
                 <BookmarkCard bookmark={bookmark} />
               </div>
             ))}
@@ -475,7 +561,7 @@ function BookmarksPageInner() {
         {!loading && bookmarks.length > 0 && viewMode === 'list' && (
           <div className="flex flex-col gap-3 max-w-3xl mx-auto">
             {bookmarks.map((bookmark) => (
-              <BookmarkCard key={bookmark.id} bookmark={bookmark} />
+              <div key={bookmark.id}>{bookmarkActions(bookmark)}<BookmarkCard bookmark={bookmark} /></div>
             ))}
           </div>
         )}
@@ -484,7 +570,7 @@ function BookmarksPageInner() {
         {!loading && bookmarks.length > 0 && viewMode === 'compact' && (
           <div className="flex flex-col divide-y divide-zinc-800/50 border border-zinc-800 rounded-2xl overflow-hidden max-w-5xl mx-auto">
             {bookmarks.map((bookmark) => (
-              <BookmarkRow key={bookmark.id} bookmark={bookmark} onClick={setOpenBookmark} />
+              <div key={bookmark.id}>{bookmarkActions(bookmark)}<BookmarkRow bookmark={bookmark} onClick={setOpenBookmark} /></div>
             ))}
           </div>
         )}

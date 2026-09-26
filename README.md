@@ -6,7 +6,7 @@
 
 安装、启动和备份见 [本地维护指南](LOCAL-SETUP.md)。本仓库不包含个人书签、数据库、登录凭据或导入记录。
 
-后续计划见 [ROADMAP.md](ROADMAP.md)。单条删除、勾选批量删除、侧边栏加载恢复及可复用增量同步目前尚未实现。以下保留上游项目介绍；其中上游安装命令的仓库地址请替换为 `https://github.com/williamwue/Siftly.git`。
+后续计划见 [ROADMAP.md](ROADMAP.md)。书签浏览页已支持单条删除及勾选批量删除，含确认提示，仅影响本地数据。侧边栏加载恢复及可复用增量同步尚未实现。以下保留上游项目介绍；其中上游安装命令的仓库地址请替换为 `https://github.com/williamwue/Siftly.git`。
 
 ---
 

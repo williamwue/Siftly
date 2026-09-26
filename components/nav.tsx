@@ -125,19 +125,24 @@ export default function Nav() {
   }, [])
 
   useEffect(() => {
-    // Fetch stats
-    fetch('/api/stats')
-      .then((r) => r.json())
-      .then((d: { totalBookmarks?: number }) => {
-        if (d.totalBookmarks !== undefined) setTotalBookmarks(d.totalBookmarks)
-      })
-      .catch(() => {})
+    function refreshCounts() {
+      // Fetch stats
+      fetch('/api/stats')
+        .then((r) => r.json())
+        .then((d: { totalBookmarks?: number }) => {
+          if (d.totalBookmarks !== undefined) setTotalBookmarks(d.totalBookmarks)
+        })
+        .catch(() => {})
 
-    // Fetch categories with counts
-    fetch('/api/categories')
-      .then((r) => r.json())
-      .then((d: { categories: CategoryItem[] }) => setCategories(d.categories ?? []))
-      .catch(() => {})
+      // Fetch categories with counts
+      fetch('/api/categories')
+        .then((r) => r.json())
+        .then((d: { categories: CategoryItem[] }) => setCategories(d.categories ?? []))
+        .catch(() => {})
+
+    }
+    refreshCounts()
+    window.addEventListener('siftly:bookmarks-changed', refreshCounts)
 
     // Poll pipeline status every 3s to show global indicator
     function pollPipeline() {
@@ -148,7 +153,10 @@ export default function Nav() {
     }
     pollPipeline()
     const interval = setInterval(pollPipeline, 3000)
-    return () => clearInterval(interval)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('siftly:bookmarks-changed', refreshCounts)
+    }
   }, [])
 
   const visibleCats = showAllCats ? categories : categories.slice(0, 8)
